@@ -10,7 +10,9 @@
     "default_popup": "popup.html",
     "default_icon": "icons/Init.png"
   },
-  "service_worker": "service-worker.js",
+  "background": {
+    "service_worker": "service-worker.js"
+  },
   "permissions": ["storage", "notifications", "alarms", "scripting", "tabs"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
