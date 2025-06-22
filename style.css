@@ -2,6 +2,7 @@ body {
     font-family: sans-serif;
     width: 300px;
     padding: 10px;
+    font-size: 14px;
 }
 
 h1 {
@@ -11,23 +12,20 @@ h1 {
     font-size: 20px;
 }
 
-button { /* General button style */
+button {
     padding: 8px 15px;
     cursor: pointer;
-    /* display: block; */ /* Removed to allow inline buttons in form */
-    /* margin: 0 auto 15px auto; */ /* Removed for more specific control */
-    margin-bottom: 10px; /* Add some bottom margin for standalone buttons */
+    margin-bottom: 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
 }
 
-#addTaskBtn { /* Specific style for the main "Add Task" button */
+#addTaskBtn {
     display: block;
-    margin: 0 auto 15px auto; /* Center it */
-}
-
-
-#taskList p {
-    text-align: center;
-    color: #555;
+    margin: 0 auto 15px auto;
+    background-color: #007bff;
+    color: white;
+    border-color: #007bff;
 }
 
 /* Form Styles */
@@ -39,7 +37,7 @@ button { /* General button style */
     background-color: #f9f9f9;
 }
 
-#addTaskForm div {
+#addTaskForm div { /* This is the generic div wrapper for label + input groups */
     margin-bottom: 12px;
 }
 
@@ -47,48 +45,206 @@ button { /* General button style */
     display: block;
     margin-bottom: 6px;
     font-weight: bold;
-    font-size: 14px;
+    font-size: 0.95em;
 }
 
 #addTaskForm input[type="text"],
 #addTaskForm input[type="url"],
-#addTaskForm input[type="number"] {
+#addTaskForm input[type="number"],
+#addTaskForm select { /* Added select here to share styles */
     width: calc(100% - 16px); /* Adjusted for padding and border */
-    padding: 7px;
+    padding: 8px; /* Standardized padding */
     border: 1px solid #ddd;
     border-radius: 4px;
-    box-sizing: border-box; /* Ensures padding doesn't add to width */
+    box-sizing: border-box;
+    font-size: 0.95em;
+    background-color: #fff; /* Ensure select has white background */
 }
 
-/* Style for buttons inside the form */
+
 #addTaskForm button {
     margin-right: 10px;
-    padding: 8px 12px; /* Slightly smaller padding for form buttons */
+    padding: 8px 12px;
+    font-size: 0.9em;
 }
 
 #addTaskForm button[type="submit"] {
-    background-color: #4CAF50; /* Green */
+    background-color: #28a745;
     color: white;
-    border: none;
+    border-color: #28a745;
 }
 
 #addTaskForm button[type="button"]#cancelAddTaskBtn {
-    background-color: #f44336; /* Red */
+    background-color: #dc3545;
     color: white;
-    border: none;
+    border-color: #dc3545;
 }
 #addTaskForm button[type="button"]#getCurrentUrlBtn {
-    background-color: #008CBA; /* Blue */
+    background-color: #17a2b8;
     color: white;
-    border: none;
-    font-size: 12px;
+    border-color: #17a2b8;
+    font-size: 0.85em;
     padding: 5px 10px;
-    margin-left: 5px; /* Space it from the URL input if they wrap */
+    margin-left: 0px;
     vertical-align: middle;
 }
 
-#addTaskForm input[type="url"] {
-    width: calc(70% - 16px); /* Adjust width to make space for the button */
-    margin-right: 5px;
-    vertical-align: middle;
+/* New styles for comparison settings elements */
+.form-section-divider {
+    border-top: 1px dashed #ccc;
+    margin-top: 20px;  /* Increased margin */
+    margin-bottom: 15px;
+    padding-top: 10px; /* Space above the text if we add text */
+    text-align: center;
+    font-size: 0.9em;
+    color: #777;
+    /* To add text inside divider, e.g., using ::before and ::after, or just text in the div */
+}
+/* If the divider div itself contains the text "比對設定" */
+.form-section-divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    color: #555;
+    font-weight: bold;
+    font-size: 0.9em;
+}
+.form-section-divider::before,
+.form-section-divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px dashed #ccc;
+}
+.form-section-divider:not(:empty)::before {
+    margin-right: .5em;
+}
+.form-section-divider:not(:empty)::after {
+    margin-left: .5em;
+}
+
+
+#taskComparisonMode {
+    /* Most styles inherited from "#addTaskForm select" above */
+    /* margin-bottom is handled by its parent div if it's like other form groups */
+}
+
+#comparisonValueContainer {
+    /* This div itself is a group, so its margin-bottom is handled by "#addTaskForm div" */
+    /* No specific styles needed unless more complex layout than a simple div wrapper */
+}
+
+#taskComparisonValue {
+    /* Inherits from "#addTaskForm input[type="text"]" */
+    /* No specific overrides needed unless desired */
+}
+
+
+/* Task List Styles */
+#taskList {
+    margin-top: 20px;
+}
+
+#taskList p {
+    text-align: center;
+    color: #555;
+    font-style: italic;
+}
+
+.task-item {
+    border: 1px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background-color: #ffffff;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.task-item .task-name {
+    margin-top: 0;
+    margin-bottom: 8px;
+    font-size: 1.05em;
+    color: #333;
+    font-weight: bold;
+}
+
+.task-item p {
+    font-size: 0.9em;
+    margin-bottom: 4px;
+    color: #454545;
+    word-wrap: break-word;
+}
+
+.task-item p.task-url {
+    color: #0069d9;
+}
+
+.task-item p.task-selector {
+    font-family: monospace;
+    background-color: #e9ecef;
+    padding: 2px 4px;
+    border-radius: 3px;
+    display: inline-block;
+}
+
+.task-item p.task-frequency {
+    color: #5a5a5a;
+}
+.task-item p.task-comparison-mode,
+.task-item p.task-comparison-value { /* Style for comparison info in task list */
+    font-size: 0.8em;
+    color: #6c757d; /* Bootstrap's secondary text color */
+    font-style: italic;
+}
+
+
+.task-item p:last-child {
+    margin-bottom: 0;
+}
+
+/* Task Action Buttons Styling */
+.task-actions-container {
+    margin-top: 12px;
+    padding-top: 8px;
+    border-top: 1px solid #eee;
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+}
+
+.task-action-btn {
+    padding: 5px 10px;
+    font-size: 0.85em;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    background-color: #f0f0f0;
+    color: #333;
+    cursor: pointer;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+}
+
+.task-action-btn:hover {
+    background-color: #e6e6e6;
+    border-color: #bbb;
+}
+
+.edit-task-btn {
+    background-color: #e9ecef;
+    border-color: #ced4da;
+}
+
+.edit-task-btn:hover {
+    background-color: #dadfe5; /* Corrected hover color */
+    border-color: #bbc2c8; /* Corrected hover color */
+}
+
+.delete-task-btn {
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+    color: #721c24;
+}
+
+.delete-task-btn:hover {
+    background-color: #f1b0b7;
+    border-color: #ec8a8e; /* Corrected hover color */
+    color: #721c24;
 }

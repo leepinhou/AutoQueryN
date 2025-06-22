@@ -26,8 +26,27 @@
             </div>
             <div>
                 <label for="taskFrequency">檢查頻率 (毫秒):</label>
-                        <input type="number" id="taskFrequency" name="taskFrequency" value="300000" min="60000" required>
+                <input type="number" id="taskFrequency" name="taskFrequency" value="300000" min="60000" required>
             </div>
+
+            <!-- New Comparison Settings -->
+            <div class="form-section-divider">比對設定</div>
+            <div>
+                <label for="taskComparisonMode">比對模式:</label>
+                <select id="taskComparisonMode" name="taskComparisonMode">
+                    <option value="anyChange">任何變更時提醒</option>
+                    <option value="includesText">包含特定文字時提醒</option>
+                    <option value="regexMatch">正則表達式匹配時提醒</option>
+                    <option value="numberGreater">數字大於上次時提醒</option>
+                    <option value="numberLesser">數字小於上次時提醒</option>
+                </select>
+            </div>
+            <div id="comparisonValueContainer" style="display: none;">
+                <label for="taskComparisonValue">比對值 (文字/正則):</label>
+                <input type="text" id="taskComparisonValue" name="taskComparisonValue" placeholder="輸入文字或正則表達式">
+            </div>
+            <!-- End New Comparison Settings -->
+
             <button type="submit">儲存任務</button>
             <button type="button" id="cancelAddTaskBtn">取消</button>
         </form>
