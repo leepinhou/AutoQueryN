@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AutoQueryN Popup</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>AutoQueryN</h1>
+    <button id="addTaskBtn">新增任務</button>
+
+    <div id="addTaskFormContainer" style="display: none;">
+        <form id="addTaskForm">
+            <div>
+                <label for="taskName">任務名稱:</label>
+                <input type="text" id="taskName" name="taskName" placeholder="例如：網站公告">
+            </div>
+            <div>
+                <label for="taskUrl">網頁 URL:</label>
+                <input type="url" id="taskUrl" name="taskUrl" required placeholder="https://example.com">
+                <button type="button" id="getCurrentUrlBtn">使用當前分頁</button>
+            </div>
+            <div>
+                <label for="taskSelector">CSS 選擇器:</label>
+                <input type="text" id="taskSelector" name="taskSelector" required placeholder="例如：h1 或 #id .class">
+            </div>
+            <div>
+                <label for="taskFrequency">檢查頻率 (毫秒):</label>
+                        <input type="number" id="taskFrequency" name="taskFrequency" value="300000" min="60000" required>
+            </div>
+            <button type="submit">儲存任務</button>
+            <button type="button" id="cancelAddTaskBtn">取消</button>
+        </form>
+    </div>
+
+    <div id="taskList">
+        <p>目前沒有任務</p>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

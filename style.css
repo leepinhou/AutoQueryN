@@ -1,0 +1,94 @@
+body {
+    font-family: sans-serif;
+    width: 300px;
+    padding: 10px;
+}
+
+h1 {
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 15px;
+    font-size: 20px;
+}
+
+button { /* General button style */
+    padding: 8px 15px;
+    cursor: pointer;
+    /* display: block; */ /* Removed to allow inline buttons in form */
+    /* margin: 0 auto 15px auto; */ /* Removed for more specific control */
+    margin-bottom: 10px; /* Add some bottom margin for standalone buttons */
+}
+
+#addTaskBtn { /* Specific style for the main "Add Task" button */
+    display: block;
+    margin: 0 auto 15px auto; /* Center it */
+}
+
+
+#taskList p {
+    text-align: center;
+    color: #555;
+}
+
+/* Form Styles */
+#addTaskFormContainer {
+    border: 1px solid #ccc;
+    padding: 15px;
+    margin-top: 15px;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+#addTaskForm div {
+    margin-bottom: 12px;
+}
+
+#addTaskForm label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+#addTaskForm input[type="text"],
+#addTaskForm input[type="url"],
+#addTaskForm input[type="number"] {
+    width: calc(100% - 16px); /* Adjusted for padding and border */
+    padding: 7px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box; /* Ensures padding doesn't add to width */
+}
+
+/* Style for buttons inside the form */
+#addTaskForm button {
+    margin-right: 10px;
+    padding: 8px 12px; /* Slightly smaller padding for form buttons */
+}
+
+#addTaskForm button[type="submit"] {
+    background-color: #4CAF50; /* Green */
+    color: white;
+    border: none;
+}
+
+#addTaskForm button[type="button"]#cancelAddTaskBtn {
+    background-color: #f44336; /* Red */
+    color: white;
+    border: none;
+}
+#addTaskForm button[type="button"]#getCurrentUrlBtn {
+    background-color: #008CBA; /* Blue */
+    color: white;
+    border: none;
+    font-size: 12px;
+    padding: 5px 10px;
+    margin-left: 5px; /* Space it from the URL input if they wrap */
+    vertical-align: middle;
+}
+
+#addTaskForm input[type="url"] {
+    width: calc(70% - 16px); /* Adjust width to make space for the button */
+    margin-right: 5px;
+    vertical-align: middle;
+}
