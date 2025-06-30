@@ -1,15 +1,72 @@
 // popup.js 腳本
-const PENDING_TASK_STORAGE_KEY = 'pendingTaskForPopup'; // Key for storing data from context menu
+const PENDING_TASK_STORAGE_KEY = 'pendingTaskForPopup';
+const ALARM_NAME_PREFIX = 'autoqueryn-task-';
+let countdownIntervalId = null;
 
-document.addEventListener('DOMContentLoaded', function() {
+function formatTime(ms) {
+    if (ms < 0) ms = 0;
+    let totalSeconds = Math.floor(ms / 1000);
+    let hours = Math.floor(totalSeconds / 3600);
+    totalSeconds %= 3600;
+    let minutes = Math.floor(totalSeconds / 60);
+    let seconds = totalSeconds % 60;
+    seconds = seconds < 10 ? '0' + seconds : seconds;
+    minutes = minutes < 10 ? '0' + minutes : minutes;
+    if (hours > 0) {
+        hours = hours < 10 ? '0' + hours : hours;
+        return `${hours}:${minutes}:${seconds}`;
+    } else {
+        return `${minutes}:${seconds}`;
+    }
+}
+
+function updateSingleCountdownElement(element, alarmName) {
+    if (!chrome.alarms || !chrome.alarms.get) {
+        element.textContent = '下次檢查: API錯誤';
+        return;
+    }
+    chrome.alarms.get(alarmName, (alarm) => {
+        if (chrome.runtime.lastError) {
+            element.textContent = '下次檢查: 錯誤';
+            return;
+        }
+        if (alarm && alarm.scheduledTime) {
+            const remainingMs = alarm.scheduledTime - Date.now();
+            if (remainingMs < -30000) {
+                element.textContent = '下次檢查: 等待更新...';
+            } else if (remainingMs < 0) {
+                element.textContent = '下次檢查: 即將執行...';
+            } else {
+                element.textContent = `下次檢查: ${formatTime(remainingMs)}`;
+            }
+        } else {
+            element.textContent = '下次檢查: 未排程';
+        }
+    });
+}
+
+function updateAllCountdowns() {
+    const countdownElements = document.querySelectorAll('.task-countdown');
+    if (countdownElements.length === 0) return;
+    countdownElements.forEach(el => {
+        const alarmName = el.dataset.alarmName;
+        if (alarmName) {
+            updateSingleCountdownElement(el, alarmName);
+        } else {
+            el.textContent = '下次檢查: 無鬧鐘名';
+        }
+    });
+}
+
+document.addEventListener('DOMContentLoaded', async function() {
     const addTaskBtn = document.getElementById('addTaskBtn');
     const addTaskFormContainer = document.getElementById('addTaskFormContainer');
     const addTaskForm = document.getElementById('addTaskForm');
     const cancelAddTaskBtn = document.getElementById('cancelAddTaskBtn');
     const getCurrentUrlBtn = document.getElementById('getCurrentUrlBtn');
     const taskUrlInput = document.getElementById('taskUrl');
-    const taskSelectorInput = document.getElementById('taskSelector'); // Added for direct access
-    const taskNameInput = document.getElementById('taskName');       // Added for direct access
+    const taskSelectorInput = document.getElementById('taskSelector');
+    const taskNameInput = document.getElementById('taskName');
     const taskListDiv = document.getElementById('taskList');
 
     const taskComparisonModeSelect = document.getElementById('taskComparisonMode');
@@ -17,46 +74,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const taskComparisonValueInput = document.getElementById('taskComparisonValue');
 
     function resetComparisonFields() {
-        if (taskComparisonModeSelect) {
-            taskComparisonModeSelect.value = 'anyChange';
-        }
-        if (taskComparisonValueInput) {
-            taskComparisonValueInput.value = '';
-        }
-        // Trigger change to hide/show comparisonValueContainer based on default mode
+        if (taskComparisonModeSelect) taskComparisonModeSelect.value = 'anyChange';
+        if (taskComparisonValueInput) taskComparisonValueInput.value = '';
         if (taskComparisonModeSelect && comparisonValueContainer) {
             taskComparisonModeSelect.dispatchEvent(new Event('change'));
-        } else if (comparisonValueContainer) { // Fallback if select is somehow not found but container is
+        } else if (comparisonValueContainer) {
             comparisonValueContainer.style.display = 'none';
         }
     }
 
     function setFormToMode(mode, taskData = null) {
         if (!addTaskForm) return;
-
         addTaskForm.dataset.mode = mode;
         const submitButton = addTaskForm.querySelector('button[type="submit"]');
-
         if (mode === 'edit' && taskData) {
             addTaskForm.dataset.editingTaskId = taskData.id;
             if (submitButton) submitButton.textContent = '更新任務';
-
             taskNameInput.value = taskData.name || '';
             taskUrlInput.value = taskData.url;
             taskSelectorInput.value = taskData.selector;
             document.getElementById('taskFrequency').value = taskData.frequency;
-
             if (taskComparisonModeSelect) taskComparisonModeSelect.value = taskData.comparisonMode || 'anyChange';
             if (taskComparisonValueInput) taskComparisonValueInput.value = taskData.comparisonValue || '';
             if (taskComparisonModeSelect) taskComparisonModeSelect.dispatchEvent(new Event('change'));
-
-        } else { // 'add' mode or reset
+        } else {
             addTaskForm.removeAttribute('data-editing-task-id');
             if (submitButton) submitButton.textContent = '儲存任務';
-            addTaskForm.reset(); // Clear native form fields
-            resetComparisonFields(); // Reset custom comparison fields
-
-            if (taskData) { // Pre-fill for add mode (e.g., from context menu)
+            addTaskForm.reset();
+            resetComparisonFields();
+            if (taskData) {
                 if(taskNameInput) taskNameInput.value = taskData.name || '';
                 if(taskUrlInput) taskUrlInput.value = taskData.url;
                 if(taskSelectorInput) taskSelectorInput.value = taskData.selector;
@@ -64,10 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-
-    if(addTaskForm) {
-        setFormToMode('add'); // Initial setup
-    }
+    if(addTaskForm) setFormToMode('add');
 
     if (taskComparisonModeSelect) {
         taskComparisonModeSelect.addEventListener('change', function(event) {
@@ -84,158 +127,180 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     async function displayTasks() {
-        // ... (displayTasks logic remains the same as before, ensuring taskListDiv is shown)
-        if (!taskListDiv) {
-            console.error("錯誤：找不到 taskListDiv 元素。");
-            return;
-        }
+        if (!taskListDiv) return;
         taskListDiv.innerHTML = '';
-        taskListDiv.style.display = 'block'; // Ensure task list is visible when displaying tasks
-
+        taskListDiv.style.display = 'block';
         try {
             const data = await chrome.storage.local.get(['tasks']);
             const tasks = data.tasks || [];
-
             if (tasks.length === 0) {
                 taskListDiv.innerHTML = '<p>目前沒有任務</p>';
                 return;
             }
-
             tasks.forEach(task => {
                 const taskItem = document.createElement('div');
                 taskItem.className = 'task-item';
                 taskItem.dataset.taskId = task.id;
-
                 const taskNameElement = document.createElement('h4');
                 taskNameElement.textContent = task.name || `任務 (ID: ${task.id.slice(-6)})`;
                 taskNameElement.className = 'task-name';
-
+                taskItem.appendChild(taskNameElement);
                 const taskUrlElement = document.createElement('p');
                 taskUrlElement.textContent = `URL: ${task.url}`;
-                taskUrlElement.className = 'task-url';
-
+                taskUrlElement.className = 'task-info task-url';
+                taskItem.appendChild(taskUrlElement);
                 const taskSelectorElement = document.createElement('p');
                 taskSelectorElement.textContent = `選擇器: ${task.selector}`;
-                taskSelectorElement.className = 'task-selector';
-
+                taskSelectorElement.className = 'task-info task-selector';
+                taskItem.appendChild(taskSelectorElement);
                 const taskFrequencyElement = document.createElement('p');
                 const frequencyInMinutes = Math.round(task.frequency / 60000);
                 taskFrequencyElement.textContent = `頻率: 每 ${frequencyInMinutes} 分鐘`;
-                taskFrequencyElement.className = 'task-frequency';
-
+                taskFrequencyElement.className = 'task-info task-frequency';
+                taskItem.appendChild(taskFrequencyElement);
                 const taskCompModeElement = document.createElement('p');
                 taskCompModeElement.textContent = `比對模式: ${task.comparisonMode || 'anyChange'}`;
-                taskCompModeElement.className = 'task-comparison-mode';
-
-                taskItem.appendChild(taskNameElement);
-                taskItem.appendChild(taskUrlElement);
-                taskItem.appendChild(taskSelectorElement);
-                taskItem.appendChild(taskFrequencyElement);
+                taskCompModeElement.className = 'task-info task-comparison-mode';
                 taskItem.appendChild(taskCompModeElement);
-
                 if(task.comparisonMode === 'includesText' || task.comparisonMode === 'regexMatch'){
                     const taskCompValueElement = document.createElement('p');
-                    taskCompValueElement.textContent = `比對值: ${task.comparisonValue || ''}`;
-                    taskCompValueElement.className = 'task-comparison-value';
+                    taskCompValueElement.textContent = `比對值: ${task.comparisonValue || '未設定'}`;
+                    taskCompValueElement.className = 'task-info task-comparison-value';
                     taskItem.appendChild(taskCompValueElement);
                 }
-
+                const countdownElement = document.createElement('p');
+                countdownElement.className = 'task-info task-countdown';
+                countdownElement.textContent = '下次檢查: 計算中...';
+                countdownElement.dataset.alarmName = `${ALARM_NAME_PREFIX}${task.id}`;
+                taskItem.appendChild(countdownElement);
+                const lastContentContainer = document.createElement('div');
+                lastContentContainer.className = 'task-last-checked-content-container task-info-sub-group';
+                const lastContentLabel = document.createElement('span');
+                lastContentLabel.className = 'task-info-label';
+                lastContentLabel.textContent = '上次內容: ';
+                lastContentContainer.appendChild(lastContentLabel);
+                const lastContentValue = document.createElement('span');
+                lastContentValue.className = 'task-last-content-value';
+                if ((task.comparisonMode === 'numberGreater' || task.comparisonMode === 'numberLesser') && task.lastNumericValue !== null && !isNaN(task.lastNumericValue)) {
+                    lastContentValue.textContent = String(task.lastNumericValue);
+                } else {
+                    lastContentValue.textContent = task.lastContent ? (task.lastContent.substring(0, 50) + (task.lastContent.length > 50 ? '...' : '')) : '尚未檢查或無內容';
+                }
+                lastContentContainer.appendChild(lastContentValue);
+                taskItem.appendChild(lastContentContainer);
                 const actionsContainer = document.createElement('div');
                 actionsContainer.className = 'task-actions-container';
-
                 const editButton = document.createElement('button');
-                editButton.textContent = '編輯';
+                editButton.textContent = '編輯設定';
                 editButton.className = 'edit-task-btn task-action-btn';
                 editButton.dataset.taskId = task.id;
-
                 const deleteButton = document.createElement('button');
-                deleteButton.textContent = '刪除';
+                deleteButton.textContent = '刪除任務';
                 deleteButton.className = 'delete-task-btn task-action-btn';
                 deleteButton.dataset.taskId = task.id;
-
                 actionsContainer.appendChild(editButton);
                 actionsContainer.appendChild(deleteButton);
                 taskItem.appendChild(actionsContainer);
+                const baselineControlWrapper = document.createElement('div');
+                baselineControlWrapper.className = 'baseline-control-wrapper';
+                const editBaselineBtn = document.createElement('button');
+                editBaselineBtn.textContent = '修改基準值';
+                editBaselineBtn.className = 'edit-baseline-btn task-action-btn';
+                editBaselineBtn.dataset.taskId = task.id;
+                baselineControlWrapper.appendChild(editBaselineBtn);
+                const baselineEditContainer = document.createElement('div');
+                baselineEditContainer.className = 'baseline-edit-container';
+                baselineEditContainer.style.display = 'none';
+                baselineEditContainer.dataset.taskId = task.id;
+                const textBaselineSection = document.createElement('div');
+                textBaselineSection.className = 'baseline-text-section';
+                const textBaselineLabel = document.createElement('label');
+                textBaselineLabel.textContent = '新文本基準:';
+                textBaselineLabel.htmlFor = `baseline-text-${task.id}`;
+                const textBaselineInput = document.createElement('textarea');
+                textBaselineInput.className = 'baseline-text-input';
+                textBaselineInput.id = `baseline-text-${task.id}`;
+                textBaselineInput.rows = 2;
+                textBaselineSection.appendChild(textBaselineLabel);
+                textBaselineSection.appendChild(textBaselineInput);
+                baselineEditContainer.appendChild(textBaselineSection);
+                const numericBaselineSection = document.createElement('div');
+                numericBaselineSection.className = 'baseline-numeric-section';
+                const numericBaselineLabel = document.createElement('label');
+                numericBaselineLabel.textContent = '新數字基準:';
+                numericBaselineLabel.htmlFor = `baseline-numeric-${task.id}`;
+                const numericBaselineInput = document.createElement('input');
+                numericBaselineInput.type = 'number';
+                numericBaselineInput.id = `baseline-numeric-${task.id}`;
+                numericBaselineInput.className = 'baseline-numeric-input';
+                numericBaselineSection.appendChild(numericBaselineLabel);
+                numericBaselineSection.appendChild(numericBaselineInput);
+                baselineEditContainer.appendChild(numericBaselineSection);
+                const saveBaselineBtn = document.createElement('button');
+                saveBaselineBtn.textContent = '儲存基準';
+                saveBaselineBtn.className = 'save-baseline-btn task-action-btn';
+                const cancelBaselineBtn = document.createElement('button');
+                cancelBaselineBtn.textContent = '取消';
+                cancelBaselineBtn.className = 'cancel-baseline-btn task-action-btn';
+                const baselineActionsDiv = document.createElement('div');
+                baselineActionsDiv.className = 'baseline-edit-actions';
+                baselineActionsDiv.appendChild(saveBaselineBtn);
+                baselineActionsDiv.appendChild(cancelBaselineBtn);
+                baselineEditContainer.appendChild(baselineActionsDiv);
+                baselineControlWrapper.appendChild(baselineEditContainer);
+                taskItem.appendChild(baselineControlWrapper);
                 taskListDiv.appendChild(taskItem);
             });
+            updateAllCountdowns();
         } catch (error) {
             console.error('讀取或顯示任務時發生錯誤:', error);
             taskListDiv.innerHTML = '<p>讀取任務列表失敗。</p>';
         }
     }
 
-    if (addTaskBtn) {
+    if (addTaskBtn) { /* ... same ... */
         addTaskBtn.addEventListener('click', function() {
-            setFormToMode('add'); // Reset form to 'add' mode
+            setFormToMode('add');
             addTaskFormContainer.style.display = 'block';
             addTaskBtn.style.display = 'none';
             if(taskListDiv) taskListDiv.style.display = 'none';
         });
     }
-
-    if (cancelAddTaskBtn) {
+    if (cancelAddTaskBtn) { /* ... same ... */
         cancelAddTaskBtn.addEventListener('click', function() {
             addTaskFormContainer.style.display = 'none';
-            setFormToMode('add'); // Reset form to 'add' mode and clear fields
-
+            setFormToMode('add');
             if(addTaskBtn) addTaskBtn.style.display = 'block';
             if(taskListDiv) taskListDiv.style.display = 'block';
-            // No need to call displayTasks() here, as no data changed. List was just hidden.
         });
     }
-
-    if (getCurrentUrlBtn && taskUrlInput) {
-        // ... (getCurrentUrlBtn logic remains the same)
+    if (getCurrentUrlBtn && taskUrlInput) { /* ... same ... */
         getCurrentUrlBtn.addEventListener('click', function() {
             chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-                if (chrome.runtime.lastError) {
-                    console.error("查詢分頁時出錯:", chrome.runtime.lastError.message);
-                    return;
-                }
-                if (tabs && tabs.length > 0) {
-                    taskUrlInput.value = tabs[0].url;
-                } else {
-                    console.warn("無法獲取當前分頁 URL");
-                }
+                if (chrome.runtime.lastError) { console.error("查詢分頁時出錯:", chrome.runtime.lastError.message); return; }
+                if (tabs && tabs.length > 0) taskUrlInput.value = tabs[0].url;
+                else console.warn("無法獲取當前分頁 URL");
             });
         });
     }
-
-    if (addTaskForm) {
+    if (addTaskForm) { /* ... same submit logic ... */
         addTaskForm.addEventListener('submit', function(event) {
-            // ... (submit logic remains largely the same, but uses setFormToMode for reset)
             event.preventDefault();
-
             const taskName = taskNameInput.value.trim();
             const taskUrlValue = taskUrlInput.value.trim();
             const taskSelectorValue = taskSelectorInput.value.trim();
             const taskFrequencyValue = document.getElementById('taskFrequency').value;
             const comparisonMode = taskComparisonModeSelect.value;
             const comparisonValue = (comparisonMode === 'includesText' || comparisonMode === 'regexMatch')
-                                     ? taskComparisonValueInput.value.trim()
-                                     : '';
-
-            if (!taskUrlValue || !taskSelectorValue || !taskFrequencyValue) {
-                alert("請填寫所有必填欄位：URL、選擇器和頻率。");
-                return;
-            }
+                                     ? taskComparisonValueInput.value.trim() : '';
+            if (!taskUrlValue || !taskSelectorValue || !taskFrequencyValue) { alert("請填寫所有必填欄位：URL、選擇器和頻率。"); return; }
             const taskFrequency = parseInt(taskFrequencyValue, 10);
-            if (isNaN(taskFrequency) || taskFrequency < 60000) {
-                 alert("檢查頻率必須是至少 60000 毫秒（1 分鐘）的數字。");
-                return;
-            }
-
+            if (isNaN(taskFrequency) || taskFrequency < 60000) { alert("檢查頻率必須是至少 60000 毫秒（1 分鐘）的數字。"); return; }
             const mode = addTaskForm.dataset.mode;
             const editingTaskId = addTaskForm.dataset.editingTaskId;
-
-            if (mode === 'edit' && !editingTaskId) {
-                alert("錯誤：處於編輯模式但找不到任務ID。請取消並重試。");
-                return;
-            }
-
+            if (mode === 'edit' && !editingTaskId) { alert("錯誤：處於編輯模式但找不到任務ID。請取消並重試。"); return; }
             let messageAction;
             let messagePayload = {};
-
             if (mode === 'edit') {
                 messageAction = 'updateTask';
                 messagePayload.taskId = editingTaskId;
@@ -252,24 +317,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 };
             }
             messagePayload.action = messageAction;
-
             chrome.runtime.sendMessage(messagePayload, function(response) {
                 const successMessageAction = mode === 'edit' ? '更新' : '新增';
                 const currentTaskId = mode === 'edit' ? editingTaskId : messagePayload.task.id;
-
-                if (chrome.runtime.lastError) {
-                    console.error(`Popup: ${successMessageAction}任務時發生通訊錯誤:`, chrome.runtime.lastError.message);
-                    alert(`${successMessageAction}任務失敗: ${chrome.runtime.lastError.message}`);
+                if (chrome.runtime.lastError) { alert(`${successMessageAction}任務失敗: ${chrome.runtime.lastError.message}`);
                 } else if (response && response.success) {
-                    console.log(`Popup: 任務 ${currentTaskId} ${successMessageAction}成功。`);
-                    setFormToMode('add'); // Reset form state to 'add' and clear fields
+                    setFormToMode('add');
                     addTaskFormContainer.style.display = 'none';
                     if(addTaskBtn) addTaskBtn.style.display = 'block';
-                    if(taskListDiv) taskListDiv.style.display = 'block';
-                } else {
-                    console.error(`Popup: 任務 ${currentTaskId} ${successMessageAction}失敗。`, response ? response.message : '未知錯誤');
-                    alert(`${successMessageAction}任務失敗: ${response ? response.message : '未知錯誤'}`);
-                }
+                } else { alert(`${successMessageAction}任務失敗: ${response ? response.message : '未知錯誤'}`); }
                 displayTasks();
             });
         });
@@ -277,67 +333,125 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (taskListDiv) {
         taskListDiv.addEventListener('click', function(event) {
-            // ... (delete logic remains the same)
             const targetButton = event.target.closest('.task-action-btn');
             if (!targetButton) return;
-            const taskId = targetButton.dataset.taskId;
+            const taskId = targetButton.dataset.taskId; // Used by edit-task-btn, delete-task-btn, edit-baseline-btn
+            const taskItem = targetButton.closest('.task-item');
+            const baselineEditContainer = taskItem ? taskItem.querySelector('.baseline-edit-container') : null;
 
             if (targetButton.classList.contains('delete-task-btn')) {
                 if (taskId && window.confirm(`確定要刪除此任務嗎？\n(ID: ${taskId})`)) {
                     chrome.runtime.sendMessage({ action: "deleteTask", taskId: taskId }, function(response) {
-                        if (chrome.runtime.lastError) {
-                            alert(`刪除任務失敗: ${chrome.runtime.lastError.message}`);
-                        } else if (!response || !response.success) {
-                            alert(`刪除任務失敗: ${response ? response.message : '未知錯誤'}`);
-                        }
+                        if (chrome.runtime.lastError) { alert(`刪除任務失敗: ${chrome.runtime.lastError.message}`);
+                        } else if (!response || !response.success) { alert(`刪除任務失敗: ${response ? response.message : '未知錯誤'}`); }
                         displayTasks();
                     });
                 }
-            } else if (targetButton.classList.contains('edit-task-btn')) {
+            } else if (targetButton.classList.contains('edit-task-btn')) { // Edit Task Settings
                 if (taskId) {
                     chrome.storage.local.get(['tasks'], function(result) {
-                        if (chrome.runtime.lastError) {
-                            alert("讀取任務資料失敗。"); return;
-                        }
+                        if (chrome.runtime.lastError) { alert("讀取任務資料失敗。"); return; }
                         const tasks = result.tasks || [];
                         const taskToEdit = tasks.find(task => task.id === taskId);
-
                         if (taskToEdit) {
-                            setFormToMode('edit', taskToEdit); // Use helper to fill form
+                            setFormToMode('edit', taskToEdit);
                             addTaskFormContainer.style.display = 'block';
                             if(addTaskBtn) addTaskBtn.style.display = 'none';
                             if(taskListDiv) taskListDiv.style.display = 'none';
-                        } else {
-                            alert('找不到要編輯的任務。');
-                        }
+                        } else { alert('找不到要編輯的任務。'); }
                     });
+                }
+            } else if (targetButton.classList.contains('edit-baseline-btn')) {
+                if (taskId && baselineEditContainer) { // Ensure baselineEditContainer is found
+                    chrome.storage.local.get(['tasks'], function(result) {
+                        if (chrome.runtime.lastError) { alert("讀取任務資料以修改基準時失敗。"); return; }
+                        const tasks = result.tasks || [];
+                        const taskToEditBaseline = tasks.find(task => task.id === taskId);
+                        if (!taskToEditBaseline) { alert('找不到要修改基準的任務。'); return; }
+
+                        const textSection = baselineEditContainer.querySelector('.baseline-text-section');
+                        const numericSection = baselineEditContainer.querySelector('.baseline-numeric-section');
+                        const textInput = baselineEditContainer.querySelector('.baseline-text-input');
+                        const numericInput = baselineEditContainer.querySelector('.baseline-numeric-input');
+
+                        if (!textSection || !numericSection || !textInput || !numericInput) { return; }
+
+                        const mode = taskToEditBaseline.comparisonMode || 'anyChange';
+                        if (mode === 'numberGreater' || mode === 'numberLesser') {
+                            numericInput.value = taskToEditBaseline.lastNumericValue !== null ? String(taskToEditBaseline.lastNumericValue) : '';
+                            numericSection.style.display = 'block'; textSection.style.display = 'none';
+                        } else {
+                            textInput.value = taskToEditBaseline.lastContent || '';
+                            textSection.style.display = 'block'; numericSection.style.display = 'none';
+                        }
+                        baselineEditContainer.dataset.editingBaselineForTaskId = taskId;
+                        baselineEditContainer.style.display = 'block';
+                        targetButton.style.display = 'none';
+                    });
+                }
+            } else if (targetButton.classList.contains('save-baseline-btn')) {
+                if (baselineEditContainer) {
+                    const currentTaskId = baselineEditContainer.dataset.editingBaselineForTaskId;
+                    chrome.storage.local.get(['tasks'], function(result) {
+                        if (chrome.runtime.lastError) { alert("讀取任務失敗，無法儲存基準。"); return; }
+                        const tasks = result.tasks || [];
+                        const task = tasks.find(t => t.id === currentTaskId);
+                        if (!task) { alert('錯誤：找不到任務以儲存基準值。'); return; }
+
+                        let newBaselineData = {};
+                        const mode = task.comparisonMode || 'anyChange';
+                        if (mode === 'numberGreater' || mode === 'numberLesser') {
+                            const numericInput = baselineEditContainer.querySelector('.baseline-numeric-input');
+                            const numericValue = parseFloat(numericInput.value);
+                            if (isNaN(numericValue)) { alert('請輸入有效的數字作為基準值。'); return; }
+                            newBaselineData.numericValue = numericValue;
+                        } else {
+                            const textInput = baselineEditContainer.querySelector('.baseline-text-input');
+                            newBaselineData.content = textInput.value;
+                        }
+
+                        chrome.runtime.sendMessage({ action: "updateTaskBaseline", taskId: currentTaskId, newBaseline: newBaselineData }, function(response) {
+                            if (response && response.success) {
+                                baselineEditContainer.style.display = 'none';
+                                const taskItemForButton = baselineEditContainer.closest('.task-item');
+                                if (taskItemForButton) {
+                                    const editBtn = taskItemForButton.querySelector('.edit-baseline-btn');
+                                    if (editBtn) editBtn.style.display = 'inline-block';
+                                }
+                                displayTasks();
+                            } else { alert(`儲存基準值失敗: ${response ? response.message : '未知錯誤'}`); }
+                        });
+                    });
+                }
+            } else if (targetButton.classList.contains('cancel-baseline-btn')) {
+                if (baselineEditContainer) {
+                    baselineEditContainer.style.display = 'none';
+                    const taskItemForButton = baselineEditContainer.closest('.task-item');
+                    if (taskItemForButton) {
+                        const editBtn = taskItemForButton.querySelector('.edit-baseline-btn');
+                        if (editBtn) editBtn.style.display = 'inline-block';
+                    }
                 }
             }
         });
     }
 
-    // Initial check for pending task from context menu
-    chrome.storage.local.get([PENDING_TASK_STORAGE_KEY], function(result) {
+    if (countdownIntervalId !== null) clearInterval(countdownIntervalId);
+    countdownIntervalId = setInterval(updateAllCountdowns, 1000);
+
+    chrome.storage.local.get([PENDING_TASK_STORAGE_KEY], async function(result) {
         const pendingTask = result[PENDING_TASK_STORAGE_KEY];
         if (pendingTask && pendingTask.url && pendingTask.selector) {
             console.log("Popup: 發現來自右鍵選單的待處理任務資料:", pendingTask);
-
-            setFormToMode('add', pendingTask); // Pre-fill form in 'add' mode
-
+            setFormToMode('add', pendingTask);
             addTaskFormContainer.style.display = 'block';
             if(addTaskBtn) addTaskBtn.style.display = 'none';
             if(taskListDiv) taskListDiv.style.display = 'none';
-
-            chrome.storage.local.remove(PENDING_TASK_STORAGE_KEY, () => {
-                if (chrome.runtime.lastError) {
-                    console.error("Popup: 清除 pendingTaskForPopup 失敗:", chrome.runtime.lastError.message);
-                } else {
-                    console.log("Popup: pendingTaskForPopup 已成功從儲存中清除。");
-                }
-            });
+            await new Promise(resolve => chrome.storage.local.remove(PENDING_TASK_STORAGE_KEY, resolve));
+            if (chrome.runtime.lastError) console.error("Popup: 清除 pendingTaskForPopup 失敗:", chrome.runtime.lastError.message);
+            else console.log("Popup: pendingTaskForPopup 已成功從儲存中清除。");
         } else {
-            console.log("Popup: 未發現待辦任務，正常載入列表。");
-            displayTasks();
+            await displayTasks();
         }
     });
 });
