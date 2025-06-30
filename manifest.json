@@ -24,78 +24,6 @@
   ],
   "web_accessible_resources": [
     {
-      "resources": ["icons/NewMessages.PNG", "icons/DesktopAlert.png", "icons/Init.png", "icons/Silent.png", "Notice.mp3"],
-      "matches": [] // Using "matches": [] as recommended for resources accessed via chrome.runtime.getURL by the extension itself.
-                     // Alternatively, could use "extension_ids": [chrome.runtime.id] if that syntax were supported directly here,
-                     // but for getURL, just listing resources is often enough.
-                     // Let's use a more common "matches": ["<all_urls>"] if files are used in content scripts directly,
-                     // but for getURL, empty or specific extension ID is better.
-                     // Given current usage (getURL in SW), empty matches or specific extension ID is most secure.
-                     // However, the prompt implies general accessibility for these assets.
-                     // Let's stick to the simple resource listing for getURL.
-                     // The new manifest linter might prefer more specific `use_dynamic_url: true` for some resources,
-                     // but for now, listing them should work with `getURL`.
-                     // Let's use a simple form that works with getURL.
-    }
-  ]
-}
-// After further thought, for `chrome.runtime.getURL`, the `matches` property in `web_accessible_resources`
-// is not what controls its accessibility by the extension itself. It's more about which web pages can access these resources.
-// For an extension accessing its own resources via `chrome.runtime.getURL()`, the simple presence of the path in `resources` is key.
-// Let's use a structure that is valid and ensures the extension can access its own files.
-// The most straightforward is listing them. "matches" can be empty or not present for extension's own use.
-// For simplicity and to avoid potential misinterpretation of "matches": ["<all_urls>"] for internal resources,
-// I will refine the `web_accessible_resources` entry.
-// A common pattern for Manifest V3 for internal use:
-// "web_accessible_resources": [{ "resources": ["path/*"], "use_dynamic_url": true/false (optional) }]
-// Or simply listing the resources:
-// "web_accessible_resources": [{ "resources": ["path1", "path2"] }]
-
-// Corrected approach for `web_accessible_resources` for `chrome.runtime.getURL` by the extension itself:
-// Just listing the resources is sufficient. `matches` is for web pages.
-// `use_dynamic_url` is for content scripts injecting elements that need to source these resources.
-// For `new Audio()` or `iconUrl` in `chrome.notifications.create` using `chrome.runtime.getURL()`,
-// the resource just needs to be listed.
-// I'll list all PNGs in icons and Notice.mp3
-// "web_accessible_resources": [
-//   {
-//     "resources": ["icons/NewMessages.PNG", "icons/DesktopAlert.png", "icons/Init.png", "icons/Silent.png", "Notice.mp3"],
-//     "matches": [] // Not strictly necessary for getURL by own extension, but harmless.
-//                   // Could also omit "matches" key entirely for this object if only one object.
-//   }
-// ]
-// Simpler, just list the files:
-// "web_accessible_resources": [
-//    "icons/NewMessages.PNG", "icons/DesktopAlert.png", "icons/Init.png", "icons/Silent.png", "Notice.mp3"
-// ]
-// This simpler form is valid in MV2 but MV3 usually expects objects with a "resources" key.
-// So, the object form is better.
-// For internal extension use via `chrome.runtime.getURL`, `matches` is not required.
-// If `matches` is specified, it allows *web pages* matching the pattern to access those resources.
-// This is not what we want.
-// The correct way for MV3 to make resources available to the extension itself via `chrome.runtime.getURL`
-// is to list them in `web_accessible_resources` using the object format with a `resources` array.
-// The `matches` field can be omitted or set to `[]` if these resources are not meant to be web-accessible to pages.
-// However, for `chrome.notifications` iconUrl, it *might* require broader accessibility if the notification
-// rendering engine is considered external. Let's use a safe pattern.
-// The example from Chrome docs for `runtime.getURL` shows:
-// "web_accessible_resources": [{ "resources": ["test.png"], "matches": ["https://example.com/*"] }]
-// This is for when `example.com` needs to load `test.png`.
-// For internal use, often `matches` can be omitted.
-// Let's use a structure that is known to work for notification icons and internal audio.
-// The most robust way is to list them and use `use_dynamic_url: true` if we want dynamic URLs,
-// or just list them for stable URLs if `use_dynamic_url` is false (default) or not specified.
-// The key is that the paths are listed.
-// I will use the object structure with just the "resources" array.
-// This makes them accessible via chrome.runtime.getURL() by the extension itself.
-// No "matches" or "extension_ids" needed for this self-access.
-// If an error occurs, I may need to add ` "use_dynamic_url": true ` or ` "matches": ["<all_urls>"]`
-// but the principle for `getURL` is just listing them.
-// Let's include all PNGs from icons and the mp3.
-// I'll use a wildcard for PNGs in the icons folder.
-// The paths must be relative to the manifest file.
-"web_accessible_resources": [
-    {
       "resources": [
         "icons/DesktopAlert.png",
         "icons/Init.png",
@@ -103,7 +31,6 @@
         "icons/Silent.png",
         "Notice.mp3"
       ]
-      // No "matches", "extension_ids", or "use_dynamic_url" needed for chrome.runtime.getURL by the extension itself.
     }
   ]
 }
