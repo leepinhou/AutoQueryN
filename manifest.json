@@ -30,7 +30,8 @@
         "icons/NewMessages.PNG",
         "icons/Silent.png",
         "Notice.mp3"
-      ]
+      ],
+      "matches": ["<all_urls>"]
     }
   ]
 }
