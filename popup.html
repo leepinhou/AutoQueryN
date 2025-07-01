@@ -7,7 +7,10 @@
 </head>
 <body>
     <h1>AutoQueryN</h1>
-    <button id="addTaskBtn">新增任務</button>
+    <div class="main-actions-container">
+        <button id="addTaskBtn">新增任務</button>
+        <button id="openAllUnreadBtn" title="開啟所有有新內容的任務並標記為已讀">開啟所有新內容</button>
+    </div>
 
     <div id="addTaskFormContainer" style="display: none;">
         <form id="addTaskForm">
@@ -29,7 +32,6 @@
                 <input type="number" id="taskFrequency" name="taskFrequency" value="300000" min="60000" required>
             </div>
 
-            <!-- New Comparison Settings -->
             <div class="form-section-divider">比對設定</div>
             <div>
                 <label for="taskComparisonMode">比對模式:</label>
@@ -45,7 +47,6 @@
                 <label for="taskComparisonValue">比對值 (文字/正則):</label>
                 <input type="text" id="taskComparisonValue" name="taskComparisonValue" placeholder="輸入文字或正則表達式">
             </div>
-            <!-- End New Comparison Settings -->
 
             <button type="submit">儲存任務</button>
             <button type="button" id="cancelAddTaskBtn">取消</button>

@@ -3,7 +3,7 @@ const PENDING_TASK_STORAGE_KEY = 'pendingTaskForPopup';
 const ALARM_NAME_PREFIX = 'autoqueryn-task-';
 let countdownIntervalId = null;
 
-function formatTime(ms) {
+function formatTime(ms) { /* ... (same) ... */
     if (ms < 0) ms = 0;
     let totalSeconds = Math.floor(ms / 1000);
     let hours = Math.floor(totalSeconds / 3600);
@@ -19,8 +19,7 @@ function formatTime(ms) {
         return `${minutes}:${seconds}`;
     }
 }
-
-function updateSingleCountdownElement(element, alarmName) {
+function updateSingleCountdownElement(element, alarmName) { /* ... (same) ... */
     if (!chrome.alarms || !chrome.alarms.get) {
         element.textContent = '下次檢查: API錯誤';
         return;
@@ -44,8 +43,7 @@ function updateSingleCountdownElement(element, alarmName) {
         }
     });
 }
-
-function updateAllCountdowns() {
+function updateAllCountdowns() { /* ... (same) ... */
     const countdownElements = document.querySelectorAll('.task-countdown');
     if (countdownElements.length === 0) return;
     countdownElements.forEach(el => {
@@ -60,6 +58,7 @@ function updateAllCountdowns() {
 
 document.addEventListener('DOMContentLoaded', async function() {
     const addTaskBtn = document.getElementById('addTaskBtn');
+    const openAllUnreadBtn = document.getElementById('openAllUnreadBtn'); // New button
     const addTaskFormContainer = document.getElementById('addTaskFormContainer');
     const addTaskForm = document.getElementById('addTaskForm');
     const cancelAddTaskBtn = document.getElementById('cancelAddTaskBtn');
@@ -73,7 +72,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     const comparisonValueContainer = document.getElementById('comparisonValueContainer');
     const taskComparisonValueInput = document.getElementById('taskComparisonValue');
 
-    function resetComparisonFields() {
+    function resetComparisonFields() { /* ... (same) ... */
         if (taskComparisonModeSelect) taskComparisonModeSelect.value = 'anyChange';
         if (taskComparisonValueInput) taskComparisonValueInput.value = '';
         if (taskComparisonModeSelect && comparisonValueContainer) {
@@ -82,8 +81,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             comparisonValueContainer.style.display = 'none';
         }
     }
-
-    function setFormToMode(mode, taskData = null) {
+    function setFormToMode(mode, taskData = null) { /* ... (same) ... */
         if (!addTaskForm) return;
         addTaskForm.dataset.mode = mode;
         const submitButton = addTaskForm.querySelector('button[type="submit"]');
@@ -112,7 +110,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 
     if(addTaskForm) setFormToMode('add');
 
-    if (taskComparisonModeSelect) {
+    if (taskComparisonModeSelect) { /* ... (event listener same) ... */
         taskComparisonModeSelect.addEventListener('change', function(event) {
             const selectedValue = event.target.value;
             if (comparisonValueContainer) {
@@ -130,17 +128,22 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (!taskListDiv) return;
         taskListDiv.innerHTML = '';
         taskListDiv.style.display = 'block';
+        let hasAnyUnread = false;
         try {
             const data = await chrome.storage.local.get(['tasks']);
             const tasks = data.tasks || [];
             if (tasks.length === 0) {
                 taskListDiv.innerHTML = '<p>目前沒有任務</p>';
+                if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none'; // Hide if no tasks
                 return;
             }
             tasks.forEach(task => {
+                if (task.hasUnreadUpdate) hasAnyUnread = true;
                 const taskItem = document.createElement('div');
                 taskItem.className = 'task-item';
+                taskItem.classList.toggle('task-item-unread', !!task.hasUnreadUpdate);
                 taskItem.dataset.taskId = task.id;
+                // ... (rest of task item creation as in previous step)
                 const taskNameElement = document.createElement('h4');
                 taskNameElement.textContent = task.name || `任務 (ID: ${task.id.slice(-6)})`;
                 taskNameElement.className = 'task-name';
@@ -173,32 +176,48 @@ document.addEventListener('DOMContentLoaded', async function() {
                 countdownElement.textContent = '下次檢查: 計算中...';
                 countdownElement.dataset.alarmName = `${ALARM_NAME_PREFIX}${task.id}`;
                 taskItem.appendChild(countdownElement);
-                const lastContentContainer = document.createElement('div');
-                lastContentContainer.className = 'task-last-checked-content-container task-info-sub-group';
-                const lastContentLabel = document.createElement('span');
-                lastContentLabel.className = 'task-info-label';
-                lastContentLabel.textContent = '上次內容: ';
-                lastContentContainer.appendChild(lastContentLabel);
-                const lastContentValue = document.createElement('span');
-                lastContentValue.className = 'task-last-content-value';
-                if ((task.comparisonMode === 'numberGreater' || task.comparisonMode === 'numberLesser') && task.lastNumericValue !== null && !isNaN(task.lastNumericValue)) {
-                    lastContentValue.textContent = String(task.lastNumericValue);
+                const lastContentDisplayContainer = document.createElement('div');
+                lastContentDisplayContainer.className = 'task-last-content-display-container task-info-sub-group';
+                const lastContentDisplayLabel = document.createElement('span');
+                lastContentDisplayLabel.className = 'task-info-label';
+                lastContentDisplayLabel.textContent = task.hasUnreadUpdate ? '最新內容: ' : '已讀內容: ';
+                lastContentDisplayContainer.appendChild(lastContentDisplayLabel);
+                const lastContentDisplayValue = document.createElement('span');
+                lastContentDisplayValue.className = 'task-last-content-value';
+                let displayContent, displayNumeric;
+                if (task.hasUnreadUpdate) {
+                    displayContent = task.lastContent;
+                    displayNumeric = task.lastNumericValue;
                 } else {
-                    lastContentValue.textContent = task.lastContent ? (task.lastContent.substring(0, 50) + (task.lastContent.length > 50 ? '...' : '')) : '尚未檢查或無內容';
+                    displayContent = task.lastAcknowledgedContent;
+                    displayNumeric = task.lastAcknowledgedNumericValue;
                 }
-                lastContentContainer.appendChild(lastContentValue);
-                taskItem.appendChild(lastContentContainer);
+                if ((task.comparisonMode === 'numberGreater' || task.comparisonMode === 'numberLesser') && displayNumeric !== null && !isNaN(displayNumeric)) {
+                    lastContentDisplayValue.textContent = String(displayNumeric);
+                } else {
+                    const contentStr = (displayContent === null || displayContent === undefined) ? '' : String(displayContent);
+                    lastContentDisplayValue.textContent = contentStr ? (contentStr.substring(0, 50) + (contentStr.length > 50 ? '...' : '')) : (task.hasUnreadUpdate ? '無內容' : '尚未確認');
+                }
+                lastContentDisplayContainer.appendChild(lastContentDisplayValue);
+                taskItem.appendChild(lastContentDisplayContainer);
                 const actionsContainer = document.createElement('div');
                 actionsContainer.className = 'task-actions-container';
+                if (task.hasUnreadUpdate) {
+                    const markAsReadButton = document.createElement('button');
+                    markAsReadButton.textContent = '查看新內容';
+                    markAsReadButton.className = 'mark-as-read-btn task-action-btn';
+                    markAsReadButton.dataset.taskId = task.id;
+                    actionsContainer.appendChild(markAsReadButton);
+                }
                 const editButton = document.createElement('button');
                 editButton.textContent = '編輯設定';
                 editButton.className = 'edit-task-btn task-action-btn';
                 editButton.dataset.taskId = task.id;
+                actionsContainer.appendChild(editButton);
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = '刪除任務';
                 deleteButton.className = 'delete-task-btn task-action-btn';
                 deleteButton.dataset.taskId = task.id;
-                actionsContainer.appendChild(editButton);
                 actionsContainer.appendChild(deleteButton);
                 taskItem.appendChild(actionsContainer);
                 const baselineControlWrapper = document.createElement('div');
@@ -251,10 +270,16 @@ document.addEventListener('DOMContentLoaded', async function() {
                 taskItem.appendChild(baselineControlWrapper);
                 taskListDiv.appendChild(taskItem);
             });
+
+            // Control visibility of "Open All Unread" button
+            if (openAllUnreadBtn) {
+                openAllUnreadBtn.style.display = hasAnyUnread ? 'inline-block' : 'none';
+            }
             updateAllCountdowns();
         } catch (error) {
             console.error('讀取或顯示任務時發生錯誤:', error);
             taskListDiv.innerHTML = '<p>讀取任務列表失敗。</p>';
+            if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none'; // Hide on error too
         }
     }
 
@@ -263,6 +288,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             setFormToMode('add');
             addTaskFormContainer.style.display = 'block';
             addTaskBtn.style.display = 'none';
+            if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none'; // Hide while form is open
             if(taskListDiv) taskListDiv.style.display = 'none';
         });
     }
@@ -271,7 +297,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             addTaskFormContainer.style.display = 'none';
             setFormToMode('add');
             if(addTaskBtn) addTaskBtn.style.display = 'block';
+            // displayTasks will be called by the submit/cancel or initial load, which will handle openAllUnreadBtn visibility
             if(taskListDiv) taskListDiv.style.display = 'block';
+            displayTasks(); // Re-render task list to update openAllUnreadBtn state
         });
     }
     if (getCurrentUrlBtn && taskUrlInput) { /* ... same ... */
@@ -283,9 +311,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         });
     }
-    if (addTaskForm) { /* ... same submit logic ... */
+    if (addTaskForm) { /* ... (submit logic includes new fields for 'add' mode correctly) ... */
         addTaskForm.addEventListener('submit', function(event) {
             event.preventDefault();
+            // ... (validation and data collection as before) ...
             const taskName = taskNameInput.value.trim();
             const taskUrlValue = taskUrlInput.value.trim();
             const taskSelectorValue = taskSelectorInput.value.trim();
@@ -312,11 +341,13 @@ document.addEventListener('DOMContentLoaded', async function() {
                 messageAction = 'addTask';
                 messagePayload.task = {
                     id: Date.now().toString(), name: taskName || '', url: taskUrlValue, selector: taskSelectorValue, frequency: taskFrequency,
-                    lastContent: '', createdAt: Date.now(),
-                    comparisonMode: comparisonMode, comparisonValue: comparisonValue, lastNumericValue: null
+                    comparisonMode: comparisonMode, comparisonValue: comparisonValue,
+                    lastContent: '', lastNumericValue: null, createdAt: Date.now(),
+                    lastAcknowledgedContent: '', lastAcknowledgedNumericValue: null, hasUnreadUpdate: false
                 };
             }
             messagePayload.action = messageAction;
+
             chrome.runtime.sendMessage(messagePayload, function(response) {
                 const successMessageAction = mode === 'edit' ? '更新' : '新增';
                 const currentTaskId = mode === 'edit' ? editingTaskId : messagePayload.task.id;
@@ -331,24 +362,64 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-    if (taskListDiv) {
+    // Event listener for "Open All Unread" button
+    if (openAllUnreadBtn) {
+        openAllUnreadBtn.addEventListener('click', function() {
+            chrome.storage.local.get(['tasks'], function(result) {
+                if (chrome.runtime.lastError) {
+                    alert("讀取任務時出錯，無法開啟新內容。");
+                    console.error("Error reading tasks for openAllUnread:", chrome.runtime.lastError.message);
+                    return;
+                }
+                const tasks = result.tasks || [];
+                const unreadTasksCount = tasks.filter(t => t.hasUnreadUpdate).length;
+
+                if (unreadTasksCount === 0) {
+                    alert("目前沒有需要開啟的新內容。");
+                    return;
+                }
+
+                if (window.confirm(`確定要開啟 ${unreadTasksCount} 個有新內容的任務頁面嗎？這些任務將被標記為已讀。`)) {
+                    openAllUnreadBtn.disabled = true;
+                    openAllUnreadBtn.textContent = '處理中...';
+
+                    chrome.runtime.sendMessage({ action: "markAllTasksAsReadAndOpen" }, function(response) {
+                        if (chrome.runtime.lastError) {
+                            alert(`處理「開啟所有新內容」時發生通訊錯誤: ${chrome.runtime.lastError.message}`);
+                            console.error("Error sending markAllTasksAsReadAndOpen:", chrome.runtime.lastError.message);
+                        } else if (response && response.success) {
+                            console.log(`Popup: ${response.processedCount} 個任務已請求標記為已讀並嘗試打開。`);
+                        } else {
+                            alert(`處理「開啟所有新內容」時發生錯誤: ${response ? response.message : '未知錯誤'}`);
+                        }
+                        openAllUnreadBtn.disabled = false;
+                        openAllUnreadBtn.textContent = '開啟所有新內容';
+                        displayTasks(); // Refresh the list
+                    });
+                }
+            });
+        });
+    }
+
+
+    if (taskListDiv) { /* ... (click listener for task actions, including mark-as-read-btn) ... */
         taskListDiv.addEventListener('click', function(event) {
             const targetButton = event.target.closest('.task-action-btn');
             if (!targetButton) return;
-            const taskId = targetButton.dataset.taskId; // Used by edit-task-btn, delete-task-btn, edit-baseline-btn
+            const taskId = targetButton.dataset.taskId;
             const taskItem = targetButton.closest('.task-item');
             const baselineEditContainer = taskItem ? taskItem.querySelector('.baseline-edit-container') : null;
 
-            if (targetButton.classList.contains('delete-task-btn')) {
-                if (taskId && window.confirm(`確定要刪除此任務嗎？\n(ID: ${taskId})`)) {
+            if (targetButton.classList.contains('delete-task-btn')) { /* ... */
+                 if (taskId && window.confirm(`確定要刪除此任務嗎？\n(ID: ${taskId})`)) {
                     chrome.runtime.sendMessage({ action: "deleteTask", taskId: taskId }, function(response) {
                         if (chrome.runtime.lastError) { alert(`刪除任務失敗: ${chrome.runtime.lastError.message}`);
                         } else if (!response || !response.success) { alert(`刪除任務失敗: ${response ? response.message : '未知錯誤'}`); }
                         displayTasks();
                     });
                 }
-            } else if (targetButton.classList.contains('edit-task-btn')) { // Edit Task Settings
-                if (taskId) {
+            } else if (targetButton.classList.contains('edit-task-btn')) { /* ... */
+                 if (taskId) {
                     chrome.storage.local.get(['tasks'], function(result) {
                         if (chrome.runtime.lastError) { alert("讀取任務資料失敗。"); return; }
                         const tasks = result.tasks || [];
@@ -357,31 +428,29 @@ document.addEventListener('DOMContentLoaded', async function() {
                             setFormToMode('edit', taskToEdit);
                             addTaskFormContainer.style.display = 'block';
                             if(addTaskBtn) addTaskBtn.style.display = 'none';
+                            if(openAllUnreadBtn) openAllUnreadBtn.style.display = 'none';
                             if(taskListDiv) taskListDiv.style.display = 'none';
                         } else { alert('找不到要編輯的任務。'); }
                     });
                 }
-            } else if (targetButton.classList.contains('edit-baseline-btn')) {
-                if (taskId && baselineEditContainer) { // Ensure baselineEditContainer is found
+            } else if (targetButton.classList.contains('edit-baseline-btn')) { /* ... */
+                if (taskId && baselineEditContainer) {
                     chrome.storage.local.get(['tasks'], function(result) {
                         if (chrome.runtime.lastError) { alert("讀取任務資料以修改基準時失敗。"); return; }
                         const tasks = result.tasks || [];
                         const taskToEditBaseline = tasks.find(task => task.id === taskId);
                         if (!taskToEditBaseline) { alert('找不到要修改基準的任務。'); return; }
-
                         const textSection = baselineEditContainer.querySelector('.baseline-text-section');
                         const numericSection = baselineEditContainer.querySelector('.baseline-numeric-section');
                         const textInput = baselineEditContainer.querySelector('.baseline-text-input');
                         const numericInput = baselineEditContainer.querySelector('.baseline-numeric-input');
-
                         if (!textSection || !numericSection || !textInput || !numericInput) { return; }
-
                         const mode = taskToEditBaseline.comparisonMode || 'anyChange';
                         if (mode === 'numberGreater' || mode === 'numberLesser') {
-                            numericInput.value = taskToEditBaseline.lastNumericValue !== null ? String(taskToEditBaseline.lastNumericValue) : '';
+                            numericInput.value = taskToEditBaseline.lastAcknowledgedNumericValue !== null ? String(taskToEditBaseline.lastAcknowledgedNumericValue) : '';
                             numericSection.style.display = 'block'; textSection.style.display = 'none';
                         } else {
-                            textInput.value = taskToEditBaseline.lastContent || '';
+                            textInput.value = taskToEditBaseline.lastAcknowledgedContent || '';
                             textSection.style.display = 'block'; numericSection.style.display = 'none';
                         }
                         baselineEditContainer.dataset.editingBaselineForTaskId = taskId;
@@ -389,7 +458,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         targetButton.style.display = 'none';
                     });
                 }
-            } else if (targetButton.classList.contains('save-baseline-btn')) {
+            } else if (targetButton.classList.contains('save-baseline-btn')) { /* ... */
                 if (baselineEditContainer) {
                     const currentTaskId = baselineEditContainer.dataset.editingBaselineForTaskId;
                     chrome.storage.local.get(['tasks'], function(result) {
@@ -397,7 +466,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const tasks = result.tasks || [];
                         const task = tasks.find(t => t.id === currentTaskId);
                         if (!task) { alert('錯誤：找不到任務以儲存基準值。'); return; }
-
                         let newBaselineData = {};
                         const mode = task.comparisonMode || 'anyChange';
                         if (mode === 'numberGreater' || mode === 'numberLesser') {
@@ -409,7 +477,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                             const textInput = baselineEditContainer.querySelector('.baseline-text-input');
                             newBaselineData.content = textInput.value;
                         }
-
                         chrome.runtime.sendMessage({ action: "updateTaskBaseline", taskId: currentTaskId, newBaseline: newBaselineData }, function(response) {
                             if (response && response.success) {
                                 baselineEditContainer.style.display = 'none';
@@ -423,7 +490,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         });
                     });
                 }
-            } else if (targetButton.classList.contains('cancel-baseline-btn')) {
+            } else if (targetButton.classList.contains('cancel-baseline-btn')) { /* ... */
                 if (baselineEditContainer) {
                     baselineEditContainer.style.display = 'none';
                     const taskItemForButton = baselineEditContainer.closest('.task-item');
@@ -431,6 +498,22 @@ document.addEventListener('DOMContentLoaded', async function() {
                         const editBtn = taskItemForButton.querySelector('.edit-baseline-btn');
                         if (editBtn) editBtn.style.display = 'inline-block';
                     }
+                }
+            } else if (targetButton.classList.contains('mark-as-read-btn')) {
+                if (taskId) {
+                    chrome.storage.local.get(['tasks'], function(result) {
+                        if (chrome.runtime.lastError) { console.error("Error fetching task for opening URL:", chrome.runtime.lastError.message); }
+                        const tasks = result.tasks || [];
+                        const taskToOpen = tasks.find(t => t.id === taskId);
+                        if (taskToOpen && taskToOpen.url) {
+                            chrome.tabs.create({ url: taskToOpen.url, active: true });
+                        } else console.warn(`Popup: 找不到任務 ${taskId} 的URL以打開。`);
+                        chrome.runtime.sendMessage({ action: "markTaskAsRead", taskId: taskId }, function(response) {
+                            if (chrome.runtime.lastError) { alert(`標記任務 ${taskId} 為已讀時失敗: ${chrome.runtime.lastError.message}`);
+                            } else if (!response || !response.success) { alert(`標記任務 ${taskId} 為已讀失敗: ${response ? response.message : '未知錯誤'}`); }
+                            displayTasks();
+                        });
+                    });
                 }
             }
         });
@@ -446,10 +529,10 @@ document.addEventListener('DOMContentLoaded', async function() {
             setFormToMode('add', pendingTask);
             addTaskFormContainer.style.display = 'block';
             if(addTaskBtn) addTaskBtn.style.display = 'none';
+            if(openAllUnreadBtn) openAllUnreadBtn.style.display = 'none';
             if(taskListDiv) taskListDiv.style.display = 'none';
             await new Promise(resolve => chrome.storage.local.remove(PENDING_TASK_STORAGE_KEY, resolve));
             if (chrome.runtime.lastError) console.error("Popup: 清除 pendingTaskForPopup 失敗:", chrome.runtime.lastError.message);
-            else console.log("Popup: pendingTaskForPopup 已成功從儲存中清除。");
         } else {
             await displayTasks();
         }
