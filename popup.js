@@ -58,7 +58,7 @@ function updateAllCountdowns() { /* ... (same) ... */
 
 document.addEventListener('DOMContentLoaded', async function() {
     const addTaskBtn = document.getElementById('addTaskBtn');
-    const openAllUnreadBtn = document.getElementById('openAllUnreadBtn'); // New button
+    const openAllUnreadBtn = document.getElementById('openAllUnreadBtn');
     const addTaskFormContainer = document.getElementById('addTaskFormContainer');
     const addTaskForm = document.getElementById('addTaskForm');
     const cancelAddTaskBtn = document.getElementById('cancelAddTaskBtn');
@@ -134,20 +134,41 @@ document.addEventListener('DOMContentLoaded', async function() {
             const tasks = data.tasks || [];
             if (tasks.length === 0) {
                 taskListDiv.innerHTML = '<p>目前沒有任務</p>';
-                if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none'; // Hide if no tasks
+                if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none';
                 return;
             }
             tasks.forEach(task => {
+                const isEnabled = task.isEnabled !== false;
                 if (task.hasUnreadUpdate) hasAnyUnread = true;
                 const taskItem = document.createElement('div');
                 taskItem.className = 'task-item';
                 taskItem.classList.toggle('task-item-unread', !!task.hasUnreadUpdate);
+                taskItem.classList.toggle('task-item-disabled', !isEnabled);
                 taskItem.dataset.taskId = task.id;
-                // ... (rest of task item creation as in previous step)
+                const taskHeader = document.createElement('div');
+                taskHeader.className = 'task-item-header';
                 const taskNameElement = document.createElement('h4');
                 taskNameElement.textContent = task.name || `任務 (ID: ${task.id.slice(-6)})`;
                 taskNameElement.className = 'task-name';
-                taskItem.appendChild(taskNameElement);
+                const switchContainer = document.createElement('div');
+                switchContainer.className = 'task-enable-switch-container';
+                const switchLabel = document.createElement('label');
+                switchLabel.className = 'task-enable-switch';
+                const switchCheckbox = document.createElement('input');
+                switchCheckbox.type = 'checkbox';
+                switchCheckbox.className = 'task-enable-checkbox';
+                switchCheckbox.dataset.taskId = task.id;
+                switchCheckbox.checked = isEnabled;
+                const switchSlider = document.createElement('span');
+                switchSlider.className = 'task-switch-slider round';
+                switchLabel.appendChild(switchCheckbox);
+                switchLabel.appendChild(switchSlider);
+                switchContainer.appendChild(switchLabel);
+                taskHeader.appendChild(taskNameElement);
+                taskHeader.appendChild(switchContainer);
+                taskItem.appendChild(taskHeader);
+
+                // ... (rest of task info elements as in previous step) ...
                 const taskUrlElement = document.createElement('p');
                 taskUrlElement.textContent = `URL: ${task.url}`;
                 taskUrlElement.className = 'task-info task-url';
@@ -173,7 +194,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
                 const countdownElement = document.createElement('p');
                 countdownElement.className = 'task-info task-countdown';
-                countdownElement.textContent = '下次檢查: 計算中...';
+                countdownElement.textContent = isEnabled ? '下次檢查: 計算中...' : '下次檢查: 已暫停';
                 countdownElement.dataset.alarmName = `${ALARM_NAME_PREFIX}${task.id}`;
                 taskItem.appendChild(countdownElement);
                 const lastContentDisplayContainer = document.createElement('div');
@@ -268,10 +289,10 @@ document.addEventListener('DOMContentLoaded', async function() {
                 baselineEditContainer.appendChild(baselineActionsDiv);
                 baselineControlWrapper.appendChild(baselineEditContainer);
                 taskItem.appendChild(baselineControlWrapper);
+
                 taskListDiv.appendChild(taskItem);
             });
 
-            // Control visibility of "Open All Unread" button
             if (openAllUnreadBtn) {
                 openAllUnreadBtn.style.display = hasAnyUnread ? 'inline-block' : 'none';
             }
@@ -279,7 +300,7 @@ document.addEventListener('DOMContentLoaded', async function() {
         } catch (error) {
             console.error('讀取或顯示任務時發生錯誤:', error);
             taskListDiv.innerHTML = '<p>讀取任務列表失敗。</p>';
-            if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none'; // Hide on error too
+            if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none';
         }
     }
 
@@ -288,7 +309,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             setFormToMode('add');
             addTaskFormContainer.style.display = 'block';
             addTaskBtn.style.display = 'none';
-            if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none'; // Hide while form is open
+            if (openAllUnreadBtn) openAllUnreadBtn.style.display = 'none';
             if(taskListDiv) taskListDiv.style.display = 'none';
         });
     }
@@ -297,9 +318,8 @@ document.addEventListener('DOMContentLoaded', async function() {
             addTaskFormContainer.style.display = 'none';
             setFormToMode('add');
             if(addTaskBtn) addTaskBtn.style.display = 'block';
-            // displayTasks will be called by the submit/cancel or initial load, which will handle openAllUnreadBtn visibility
             if(taskListDiv) taskListDiv.style.display = 'block';
-            displayTasks(); // Re-render task list to update openAllUnreadBtn state
+            displayTasks();
         });
     }
     if (getCurrentUrlBtn && taskUrlInput) { /* ... same ... */
@@ -311,10 +331,9 @@ document.addEventListener('DOMContentLoaded', async function() {
             });
         });
     }
-    if (addTaskForm) { /* ... (submit logic includes new fields for 'add' mode correctly) ... */
+    if (addTaskForm) { /* ... same submit logic ... */
         addTaskForm.addEventListener('submit', function(event) {
             event.preventDefault();
-            // ... (validation and data collection as before) ...
             const taskName = taskNameInput.value.trim();
             const taskUrlValue = taskUrlInput.value.trim();
             const taskSelectorValue = taskSelectorInput.value.trim();
@@ -343,11 +362,11 @@ document.addEventListener('DOMContentLoaded', async function() {
                     id: Date.now().toString(), name: taskName || '', url: taskUrlValue, selector: taskSelectorValue, frequency: taskFrequency,
                     comparisonMode: comparisonMode, comparisonValue: comparisonValue,
                     lastContent: '', lastNumericValue: null, createdAt: Date.now(),
-                    lastAcknowledgedContent: '', lastAcknowledgedNumericValue: null, hasUnreadUpdate: false
+                    lastAcknowledgedContent: '', lastAcknowledgedNumericValue: null, hasUnreadUpdate: false,
+                    isEnabled: true
                 };
             }
             messagePayload.action = messageAction;
-
             chrome.runtime.sendMessage(messagePayload, function(response) {
                 const successMessageAction = mode === 'edit' ? '更新' : '新增';
                 const currentTaskId = mode === 'edit' ? editingTaskId : messagePayload.task.id;
@@ -362,47 +381,9 @@ document.addEventListener('DOMContentLoaded', async function() {
         });
     }
 
-    // Event listener for "Open All Unread" button
-    if (openAllUnreadBtn) {
-        openAllUnreadBtn.addEventListener('click', function() {
-            chrome.storage.local.get(['tasks'], function(result) {
-                if (chrome.runtime.lastError) {
-                    alert("讀取任務時出錯，無法開啟新內容。");
-                    console.error("Error reading tasks for openAllUnread:", chrome.runtime.lastError.message);
-                    return;
-                }
-                const tasks = result.tasks || [];
-                const unreadTasksCount = tasks.filter(t => t.hasUnreadUpdate).length;
-
-                if (unreadTasksCount === 0) {
-                    alert("目前沒有需要開啟的新內容。");
-                    return;
-                }
-
-                if (window.confirm(`確定要開啟 ${unreadTasksCount} 個有新內容的任務頁面嗎？這些任務將被標記為已讀。`)) {
-                    openAllUnreadBtn.disabled = true;
-                    openAllUnreadBtn.textContent = '處理中...';
-
-                    chrome.runtime.sendMessage({ action: "markAllTasksAsReadAndOpen" }, function(response) {
-                        if (chrome.runtime.lastError) {
-                            alert(`處理「開啟所有新內容」時發生通訊錯誤: ${chrome.runtime.lastError.message}`);
-                            console.error("Error sending markAllTasksAsReadAndOpen:", chrome.runtime.lastError.message);
-                        } else if (response && response.success) {
-                            console.log(`Popup: ${response.processedCount} 個任務已請求標記為已讀並嘗試打開。`);
-                        } else {
-                            alert(`處理「開啟所有新內容」時發生錯誤: ${response ? response.message : '未知錯誤'}`);
-                        }
-                        openAllUnreadBtn.disabled = false;
-                        openAllUnreadBtn.textContent = '開啟所有新內容';
-                        displayTasks(); // Refresh the list
-                    });
-                }
-            });
-        });
-    }
-
-
-    if (taskListDiv) { /* ... (click listener for task actions, including mark-as-read-btn) ... */
+    // Combined event listener for clicks and changes on the task list
+    if (taskListDiv) {
+        // For buttons
         taskListDiv.addEventListener('click', function(event) {
             const targetButton = event.target.closest('.task-action-btn');
             if (!targetButton) return;
@@ -410,15 +391,16 @@ document.addEventListener('DOMContentLoaded', async function() {
             const taskItem = targetButton.closest('.task-item');
             const baselineEditContainer = taskItem ? taskItem.querySelector('.baseline-edit-container') : null;
 
-            if (targetButton.classList.contains('delete-task-btn')) { /* ... */
+            if (targetButton.classList.contains('delete-task-btn')) { /* ... delete logic ... */
                  if (taskId && window.confirm(`確定要刪除此任務嗎？\n(ID: ${taskId})`)) {
                     chrome.runtime.sendMessage({ action: "deleteTask", taskId: taskId }, function(response) {
-                        if (chrome.runtime.lastError) { alert(`刪除任務失敗: ${chrome.runtime.lastError.message}`);
-                        } else if (!response || !response.success) { alert(`刪除任務失敗: ${response ? response.message : '未知錯誤'}`); }
+                        if (chrome.runtime.lastError || !response || !response.success) {
+                            alert(`刪除任務失敗: ${response ? response.message : chrome.runtime.lastError.message || '未知錯誤'}`);
+                        }
                         displayTasks();
                     });
                 }
-            } else if (targetButton.classList.contains('edit-task-btn')) { /* ... */
+            } else if (targetButton.classList.contains('edit-task-btn')) { /* ... edit settings logic ... */
                  if (taskId) {
                     chrome.storage.local.get(['tasks'], function(result) {
                         if (chrome.runtime.lastError) { alert("讀取任務資料失敗。"); return; }
@@ -433,7 +415,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         } else { alert('找不到要編輯的任務。'); }
                     });
                 }
-            } else if (targetButton.classList.contains('edit-baseline-btn')) { /* ... */
+            } else if (targetButton.classList.contains('edit-baseline-btn')) { /* ... edit baseline logic ... */
                 if (taskId && baselineEditContainer) {
                     chrome.storage.local.get(['tasks'], function(result) {
                         if (chrome.runtime.lastError) { alert("讀取任務資料以修改基準時失敗。"); return; }
@@ -458,7 +440,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         targetButton.style.display = 'none';
                     });
                 }
-            } else if (targetButton.classList.contains('save-baseline-btn')) { /* ... */
+            } else if (targetButton.classList.contains('save-baseline-btn')) { /* ... save baseline logic ... */
                 if (baselineEditContainer) {
                     const currentTaskId = baselineEditContainer.dataset.editingBaselineForTaskId;
                     chrome.storage.local.get(['tasks'], function(result) {
@@ -490,7 +472,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         });
                     });
                 }
-            } else if (targetButton.classList.contains('cancel-baseline-btn')) { /* ... */
+            } else if (targetButton.classList.contains('cancel-baseline-btn')) { /* ... cancel baseline logic ... */
                 if (baselineEditContainer) {
                     baselineEditContainer.style.display = 'none';
                     const taskItemForButton = baselineEditContainer.closest('.task-item');
@@ -499,7 +481,7 @@ document.addEventListener('DOMContentLoaded', async function() {
                         if (editBtn) editBtn.style.display = 'inline-block';
                     }
                 }
-            } else if (targetButton.classList.contains('mark-as-read-btn')) {
+            } else if (targetButton.classList.contains('mark-as-read-btn')) { /* ... mark as read logic ... */
                 if (taskId) {
                     chrome.storage.local.get(['tasks'], function(result) {
                         if (chrome.runtime.lastError) { console.error("Error fetching task for opening URL:", chrome.runtime.lastError.message); }
@@ -509,12 +491,43 @@ document.addEventListener('DOMContentLoaded', async function() {
                             chrome.tabs.create({ url: taskToOpen.url, active: true });
                         } else console.warn(`Popup: 找不到任務 ${taskId} 的URL以打開。`);
                         chrome.runtime.sendMessage({ action: "markTaskAsRead", taskId: taskId }, function(response) {
-                            if (chrome.runtime.lastError) { alert(`標記任務 ${taskId} 為已讀時失敗: ${chrome.runtime.lastError.message}`);
-                            } else if (!response || !response.success) { alert(`標記任務 ${taskId} 為已讀失敗: ${response ? response.message : '未知錯誤'}`); }
+                            if (chrome.runtime.lastError || !response || !response.success) {
+                                alert(`標記任務 ${taskId} 為已讀時失敗: ${response ? response.message : '未知錯誤'}`);
+                            }
                             displayTasks();
                         });
                     });
                 }
+            }
+        });
+
+        // For checkbox change event
+        taskListDiv.addEventListener('change', function(event) {
+            if (event.target.classList.contains('task-enable-checkbox')) {
+                const checkbox = event.target;
+                const taskId = checkbox.dataset.taskId;
+                const isEnabled = checkbox.checked;
+
+                checkbox.disabled = true; // Disable to prevent rapid toggling
+
+                chrome.runtime.sendMessage({ action: "toggleTaskEnabled", taskId: taskId, isEnabled: isEnabled }, function(response) {
+                    checkbox.disabled = false; // Re-enable after operation completes
+
+                    if (response && response.success) {
+                        console.log(`Popup: 任務 ${taskId} 狀態已成功更新為: ${isEnabled}`);
+                        // Refresh the entire list to update all related UI (countdown text, styles, etc.)
+                        displayTasks();
+                    } else {
+                        console.error(`Popup: 切換任務 ${taskId} 狀態失敗。`, response);
+                        alert('切換任務狀態失敗，請重試。');
+                        // Revert the UI to its previous state on failure
+                        checkbox.checked = !isEnabled;
+                        const taskItem = checkbox.closest('.task-item');
+                        if (taskItem) {
+                            taskItem.classList.toggle('task-item-disabled', !isEnabled);
+                        }
+                    }
+                });
             }
         });
     }

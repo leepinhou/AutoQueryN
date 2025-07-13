@@ -1,5 +1,23 @@
 // service-worker.js 腳本
 
+// 任務物件結構範例：
+// {
+//   id: string, // 唯一ID
+//   name: string, // 任務名稱
+//   url: string, // 目標網頁 URL
+//   selector: string, // CSS 選擇器
+//   frequency: number, // 檢查頻率 (毫秒)
+//   createdAt: number, // 建立時間戳
+//   comparisonMode: string, // 比對模式: 'anyChange', 'includesText', 'numberGreater', 'numberLesser', 'regexMatch'
+//   comparisonValue: string, // 比對輔助值 (例如，用於 'includesText' 的特定文本, 'regexMatch' 的正則表達式)
+//   lastContent: string, // [扮演 lastCheckedContent 的角色] 上次檢查時從網頁獲取的最新文本內容
+//   lastNumericValue: number | null, // [扮演 lastCheckedNumericValue 的角色] 上次檢查時從網頁獲取的最新數值
+//   lastAcknowledgedContent: string, // 使用者上次確認/“已讀”時的文本內容
+//   lastAcknowledgedNumericValue: number | null, // 使用者上次確認/“已讀”時的數值
+//   hasUnreadUpdate: boolean, // 是否有新的、使用者尚未確認的更新
+//   isEnabled: boolean // 任務是否啟用，預設為 true
+// }
+
 const TASK_STORAGE_KEY = 'tasks';
 const ALARM_NAME_PREFIX = 'autoqueryn-task-';
 const PENDING_TASK_STORAGE_KEY = 'pendingTaskForPopup';
@@ -64,6 +82,7 @@ async function scheduleAlarmForTask(task) { /* ... (same) ... */
     const periodInMinutes = Math.max(1, Math.round(task.frequency / (60 * 1000)));
     try {
         await chrome.alarms.create(alarmName, { periodInMinutes: periodInMinutes });
+        console.log(`鬧鐘已為任務 "${task.name || task.id}" 設定。`);
     } catch (error) { console.error(`為任務 "${task.name || task.id}" 設定鬧鐘 ${alarmName} 失敗:`, error); }
 }
 function sendNotification(task, descriptiveMessage, newRawContent) { /* ... (same) ... */
@@ -233,18 +252,16 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             } catch (error) { console.error(`SW: markTaskAsRead Error:`, error); sendResponse({ success: false, message: error.message }); }
         })();
         return true;
-    } else if (message.action === "markAllTasksAsReadAndOpen") { // New Handler
+    } else if (message.action === "markAllTasksAsReadAndOpen") { /* ... (same) ... */
         (async () => {
             try {
                 const tasks = await getTasks();
                 let processedCount = 0;
                 let tasksWereModified = false;
 
-                for (let i = 0; i < tasks.length; i++) { // Use for loop to allow await inside
+                for (let i = 0; i < tasks.length; i++) {
                     if (tasks[i].hasUnreadUpdate) {
                         if (tasks[i].url) {
-                            // Open tabs in the background, except maybe the last one
-                            // For simplicity, all in background. User can navigate.
                             await chrome.tabs.create({ url: tasks[i].url, active: false });
                         }
                         tasks[i].lastAcknowledgedContent = tasks[i].lastContent;
@@ -268,10 +285,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             }
         })();
         return true;
+    } else if (message.action === "toggleTaskEnabled" && message.taskId !== undefined && message.isEnabled !== undefined) {
+        (async () => {
+            try {
+                const { taskId, isEnabled } = message;
+                const tasks = await getTasks();
+                const taskIndex = tasks.findIndex(task => task.id === taskId);
+
+                if (taskIndex === -1) {
+                    sendResponse({ success: false, message: `任務 ID ${taskId} 未找到。` });
+                    return;
+                }
+
+                const taskToToggle = tasks[taskIndex];
+                taskToToggle.isEnabled = isEnabled;
+
+                await saveTasks(tasks);
+
+                const alarmName = `${ALARM_NAME_PREFIX}${taskId}`;
+                if (isEnabled) {
+                    await scheduleAlarmForTask(taskToToggle);
+                    console.log(`Service Worker: 任務 "${taskToToggle.name || taskId}" 已啟用，鬧鐘已設定。`);
+                } else {
+                    await chrome.alarms.clear(alarmName);
+                    console.log(`Service Worker: 任務 "${taskToToggle.name || taskId}" 已禁用，鬧鐘已清除。`);
+                }
+
+                sendResponse({ success: true, message: `任務已${isEnabled ? '啟用' : '禁用'}` });
+
+            } catch (error) {
+                console.error(`Service Worker: 切換任務 ${message.taskId} 啟用狀態時發生錯誤:`, error);
+                sendResponse({ success: false, message: error.message });
+            }
+        })();
+        return true;
     }
 });
 
-async function checkTask(task) { /* ... (same as last version) ... */
+async function checkTask(task) { /* ... (same) ... */
     if (!task || !task.url || !task.selector) { console.error('無效的任務物件，無法檢查:', task); return; }
     let currentTaskState = { ...task };
     let newContentRaw;
@@ -368,12 +419,19 @@ function getElementContentBySelector(selector) { /* ... (same) ... */
     if (element) return element.innerText;
     return null;
 }
-chrome.alarms.onAlarm.addListener(async (alarm) => { /* ... (same) ... */
+chrome.alarms.onAlarm.addListener(async (alarm) => { /* ... (same as last version, with isEnabled check) ... */
     if (alarm.name.startsWith(ALARM_NAME_PREFIX)) {
         const taskId = alarm.name.substring(ALARM_NAME_PREFIX.length);
-        const tasks = await getTasks(); const taskToRun = tasks.find(t => t.id === taskId);
-        if (taskToRun) await checkTask(taskToRun);
-        else {
+        const tasks = await getTasks();
+        const taskToRun = tasks.find(t => t.id === taskId);
+
+        if (taskToRun) {
+            if (taskToRun.isEnabled === false) {
+                return;
+            }
+            await checkTask(taskToRun);
+
+        } else {
             console.warn(`鬧鐘 "${alarm.name}" 觸發，但找不到ID: ${taskId}。嘗試清除孤立鬧鐘。`);
             try { await chrome.alarms.clear(alarm.name); console.log(`已清除孤立鬧鐘: ${alarm.name}`); }
             catch (clearError) { console.error(`清除孤立鬧鐘 ${alarm.name} 失敗:`, clearError); }
@@ -389,11 +447,16 @@ chrome.alarms.onAlarm.addListener(async (alarm) => { /* ... (same) ... */
                 const alarmName = `${ALARM_NAME_PREFIX}${task.id}`;
                 try {
                     const existingAlarm = await chrome.alarms.get(alarmName);
-                    if (!existingAlarm) { await scheduleAlarmForTask(task); rescheduled++; }
-                    else existing++;
+                    if (!existingAlarm && (task.isEnabled === undefined || task.isEnabled === true)) { // Only schedule for enabled tasks
+                         await scheduleAlarmForTask(task);
+                         rescheduled++;
+                    } else if (existingAlarm && task.isEnabled === false) { // If task is disabled but alarm exists, clear it
+                         await chrome.alarms.clear(alarmName);
+                    } else {
+                         existing++;
+                    }
                 } catch (e) { console.error(`處理任務 ${task.id} 鬧鐘錯誤:`, e); }
             }
-            // console.log(`鬧鐘初始化完成。重排程 ${rescheduled}，已存在 ${existing}。`);
         }
     } catch (initError) { console.error("初始化任務鬧鐘錯誤:", initError); }
 })();
