@@ -322,20 +322,63 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
-async function checkTask(task) { /* ... (same) ... */
-    if (!task || !task.url || !task.selector) { console.error('無效的任務物件，無法檢查:', task); return; }
+async function checkTask(task) {
+    if (!task || !task.url || !task.selector) {
+        console.error('無效的任務物件，無法檢查:', task);
+        return;
+    }
+
     let currentTaskState = { ...task };
-    let newContentRaw;
+    let newContentRaw = null;
+
     try {
+        // First, try to get content from an active tab to be efficient
         const tabs = await chrome.tabs.query({ url: currentTaskState.url });
-        if (tabs.length === 0) return;
-        const tabId = tabs[0].id;
-        const injectionResults = await chrome.scripting.executeScript({ target: { tabId: tabId }, func: getElementContentBySelector, args: [currentTaskState.selector] });
-        if (!injectionResults || injectionResults.length === 0 || injectionResults[0].result === undefined) {
-            newContentRaw = null;
-            if (currentTaskState.lastContent !== null && currentTaskState.lastContent !== "") console.warn(`任務 "${currentTaskState.name||currentTaskState.id}" - 無法獲取內容 (之前有)。`);
-        } else newContentRaw = injectionResults[0].result;
-    } catch (error) { console.error(`檢查任務 "${currentTaskState.name||currentTaskState.id}" (${currentTaskState.url}) 獲取內容階段錯誤:`, error); return; }
+        let contentFoundInTab = false;
+        if (tabs.length > 0) {
+            try {
+                const tabId = tabs[0].id;
+                const injectionResults = await chrome.scripting.executeScript({
+                    target: { tabId: tabId },
+                    func: getElementContentBySelector,
+                    args: [currentTaskState.selector]
+                });
+                if (injectionResults && injectionResults.length > 0 && injectionResults[0].result !== undefined) {
+                    newContentRaw = injectionResults[0].result;
+                    contentFoundInTab = true;
+                }
+            } catch (injectionError) {
+                // Ignore injection error, fallback to fetch
+            }
+        }
+
+        // If no active tab or injection failed, fall back to fetch
+        if (!contentFoundInTab) {
+            try {
+                const response = await fetch(currentTaskState.url);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const htmlText = await response.text();
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(htmlText, "text/html");
+                const element = doc.querySelector(currentTaskState.selector);
+                if (element) {
+                    newContentRaw = element.innerText;
+                } else {
+                    newContentRaw = null;
+                }
+            } catch (fetchError) {
+                console.error(`任務 "${currentTaskState.name || currentTaskState.id}" 使用 fetch 獲取內容失敗:`, fetchError);
+                // Decide if we should return or continue with null content
+                // Continuing allows comparison logic to handle "content disappeared" cases
+            }
+        }
+
+    } catch (error) {
+        console.error(`檢查任務 "${currentTaskState.name || currentTaskState.id}" (${currentTaskState.url}) 獲取內容階段發生未知錯誤:`, error);
+        return; // Exit if there's a critical error in the logic above
+    }
 
     const newContentString = (newContentRaw === null || newContentRaw === undefined) ? "" : String(newContentRaw);
     let currentNumericValue = null;
