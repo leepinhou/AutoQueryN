@@ -13,7 +13,7 @@
   "background": {
     "service_worker": "service-worker.js"
   },
-  "permissions": ["storage", "notifications", "alarms", "scripting", "tabs", "contextMenus"],
+  "permissions": ["storage", "notifications", "alarms", "scripting", "tabs", "contextMenus", "offscreen"],
   "host_permissions": ["<all_urls>"],
   "content_scripts": [
     {

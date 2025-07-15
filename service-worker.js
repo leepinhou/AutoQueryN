@@ -322,6 +322,49 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 });
 
+const OFFSCREEN_DOCUMENT_PATH = '/offscreen.html';
+
+async function hasOffscreenDocument() {
+    if ('getContexts' in chrome.runtime) {
+        const contexts = await chrome.runtime.getContexts({
+            contextTypes: ['OFFSCREEN_DOCUMENT'],
+            documentUrls: [chrome.runtime.getURL(OFFSCREEN_DOCUMENT_PATH)]
+        });
+        return contexts.length > 0;
+    } else {
+        // Fallback for older browsers
+        const views = chrome.extension.getViews({ type: 'OFFSCREEN_DOCUMENT' });
+        return views.length > 0;
+    }
+}
+
+async function setupOffscreenDocument() {
+    if (await hasOffscreenDocument()) {
+        return;
+    }
+    await chrome.offscreen.createDocument({
+        url: OFFSCREEN_DOCUMENT_PATH,
+        reasons: ['DOM_PARSER'],
+        justification: 'Parse HTML string to get element content',
+    });
+}
+
+async function parseHtmlInOffscreen(htmlString, selector) {
+    await setupOffscreenDocument();
+    const response = await chrome.runtime.sendMessage({
+        action: 'parseHTML',
+        htmlString,
+        selector,
+        target: 'offscreen'
+    });
+    if (response.success) {
+        return response.content;
+    } else {
+        throw new Error(response.error || 'Failed to parse HTML in offscreen document.');
+    }
+}
+
+
 async function checkTask(task) {
     if (!task || !task.url || !task.selector) {
         console.error('無效的任務物件，無法檢查:', task);
@@ -360,18 +403,9 @@ async function checkTask(task) {
                     throw new Error(`HTTP error! status: ${response.status}`);
                 }
                 const htmlText = await response.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(htmlText, "text/html");
-                const element = doc.querySelector(currentTaskState.selector);
-                if (element) {
-                    newContentRaw = element.innerText;
-                } else {
-                    newContentRaw = null;
-                }
+                newContentRaw = await parseHtmlInOffscreen(htmlText, currentTaskState.selector);
             } catch (fetchError) {
                 console.error(`任務 "${currentTaskState.name || currentTaskState.id}" 使用 fetch 獲取內容失敗:`, fetchError);
-                // Decide if we should return or continue with null content
-                // Continuing allows comparison logic to handle "content disappeared" cases
             }
         }
 
