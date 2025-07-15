@@ -234,19 +234,25 @@ document.addEventListener('DOMContentLoaded', async function() {
                 editButton.textContent = '編輯設定';
                 editButton.className = 'edit-task-btn task-action-btn';
                 editButton.dataset.taskId = task.id;
+                // Edit button should always be enabled
                 actionsContainer.appendChild(editButton);
+
                 const deleteButton = document.createElement('button');
                 deleteButton.textContent = '刪除任務';
                 deleteButton.className = 'delete-task-btn task-action-btn';
                 deleteButton.dataset.taskId = task.id;
+                // Delete button should always be enabled
                 actionsContainer.appendChild(deleteButton);
                 taskItem.appendChild(actionsContainer);
+
                 const baselineControlWrapper = document.createElement('div');
                 baselineControlWrapper.className = 'baseline-control-wrapper';
                 const editBaselineBtn = document.createElement('button');
                 editBaselineBtn.textContent = '修改基準值';
                 editBaselineBtn.className = 'edit-baseline-btn task-action-btn';
                 editBaselineBtn.dataset.taskId = task.id;
+                // Baseline button should be disabled if the task is not enabled
+                editBaselineBtn.disabled = !isEnabled;
                 baselineControlWrapper.appendChild(editBaselineBtn);
                 const baselineEditContainer = document.createElement('div');
                 baselineEditContainer.className = 'baseline-edit-container';

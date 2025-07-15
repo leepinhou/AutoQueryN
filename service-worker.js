@@ -354,13 +354,13 @@ async function parseHtmlInOffscreen(htmlString, selector) {
     const response = await chrome.runtime.sendMessage({
         action: 'parseHTML',
         htmlString,
-        selector,
-        target: 'offscreen'
+        selector
     });
-    if (response.success) {
+    if (response && response.success) {
         return response.content;
     } else {
-        throw new Error(response.error || 'Failed to parse HTML in offscreen document.');
+        const errorMessage = response ? response.error : 'No response from offscreen document.';
+        throw new Error(errorMessage || 'Failed to parse HTML in offscreen document.');
     }
 }
 
