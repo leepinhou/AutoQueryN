@@ -1,5 +1,10 @@
 // offscreen.js
 
+// Heartbeat to keep the offscreen document alive.
+setInterval(() => {
+  chrome.runtime.getPlatformInfo();
+}, 20 * 1000);
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === 'parseHTML') {
     const { htmlString, selector } = request;

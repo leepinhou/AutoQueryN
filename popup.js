@@ -251,8 +251,6 @@ document.addEventListener('DOMContentLoaded', async function() {
                 editBaselineBtn.textContent = '修改基準值';
                 editBaselineBtn.className = 'edit-baseline-btn task-action-btn';
                 editBaselineBtn.dataset.taskId = task.id;
-                // Baseline button should be disabled if the task is not enabled
-                editBaselineBtn.disabled = !isEnabled;
                 baselineControlWrapper.appendChild(editBaselineBtn);
                 const baselineEditContainer = document.createElement('div');
                 baselineEditContainer.className = 'baseline-edit-container';
