@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>AutoQueryN Popup</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>AutoQueryN</h1>
+    <div class="main-actions-container">
+        <button id="addTaskBtn">新增任務</button>
+        <button id="openAllUnreadBtn" title="開啟所有有新內容的任務並標記為已讀">開啟所有新內容</button>
+    </div>
+
+    <div id="addTaskFormContainer" style="display: none;">
+        <form id="addTaskForm">
+            <div>
+                <label for="taskName">任務名稱:</label>
+                <input type="text" id="taskName" name="taskName" placeholder="例如：網站公告">
+            </div>
+            <div>
+                <label for="taskUrl">網頁 URL:</label>
+                <input type="url" id="taskUrl" name="taskUrl" required placeholder="https://example.com">
+                <button type="button" id="getCurrentUrlBtn">使用當前分頁</button>
+            </div>
+            <div>
+                <label for="taskSelector">CSS 選擇器:</label>
+                <input type="text" id="taskSelector" name="taskSelector" required placeholder="例如：h1 或 #id .class">
+            </div>
+            <div>
+                <label for="taskFrequency">檢查頻率 (毫秒):</label>
+                <input type="number" id="taskFrequency" name="taskFrequency" value="300000" min="60000" required>
+            </div>
+
+            <div class="form-section-divider">比對設定</div>
+            <div>
+                <label for="taskComparisonMode">比對模式:</label>
+                <select id="taskComparisonMode" name="taskComparisonMode">
+                    <option value="anyChange">任何變更時提醒</option>
+                    <option value="includesText">包含特定文字時提醒</option>
+                    <option value="regexMatch">正則表達式匹配時提醒</option>
+                    <option value="numberGreater">數字大於上次時提醒</option>
+                    <option value="numberLesser">數字小於上次時提醒</option>
+                </select>
+            </div>
+            <div id="comparisonValueContainer" style="display: none;">
+                <label for="taskComparisonValue">比對值 (文字/正則):</label>
+                <input type="text" id="taskComparisonValue" name="taskComparisonValue" placeholder="輸入文字或正則表達式">
+            </div>
+
+            <button type="submit">儲存任務</button>
+            <button type="button" id="cancelAddTaskBtn">取消</button>
+        </form>
+    </div>
+
+    <div id="taskList">
+        <p>目前沒有任務</p>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+{
+  "manifest_version": 3,
+  "name": "AutoQueryN",
+  "version": "0.1.0",
+  "description": "自動檢查網頁內容更新並提醒使用者。",
+  "icons": {
+    "48": "icons/Init.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icons/Init.png"
+  },
+  "background": {
+    "service_worker": "service-worker.js"
+  },
+  "permissions": ["storage", "notifications", "alarms", "scripting", "tabs", "contextMenus", "offscreen"],
+  "host_permissions": ["<all_urls>"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/DesktopAlert.png",
+        "icons/Init.png",
+        "icons/NewMessages.PNG",
+        "icons/Silent.png",
+        "Notice.mp3"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ]
+}
